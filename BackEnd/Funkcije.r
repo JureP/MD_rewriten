@@ -341,6 +341,7 @@ save_mergeMetaProblems <- function(outputProfile,
 	nameProblem <- paste0('metaProblem[BL]', parameters$bl,'[trainBL]', namesOfSet[1],
 								'[sosedSet]',namesOfSet[2], '[metaSet]',namesOfSet[3], 
 								'[K]', K, '[Kp]',Kp, '[Dist]euclid.rds')
+	setwd(FolderSave)
 	saveRDS(metaProblem, nameProblem)
 	saveRDS(OP_meta_1, paste0("OF_", outputProfileName, "X", length(namesBL), ".rds"))	
 }

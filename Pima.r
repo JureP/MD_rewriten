@@ -1,3 +1,5 @@
+
+## source("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Koda\\Pima.r")
 ## funkcije:
 source("C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Koda/BackEnd/Funkcije.r")
 library(mlbench)
@@ -15,8 +17,8 @@ onsovniPodatki_FM <- osnovniPodatki[, -9]
 set.seed(123)
 
 ## adjustable parameters 
-nRepets <- 1 ## number of cross validations
-nBL <- 13 ## number of baseLearners
+nRepets <- 10 ## number of cross validations
+nBL <- 15 ## number of baseLearners
 K <- 5
 Kp <- 5
 metaALG <- "rf"
@@ -197,14 +199,15 @@ for(i in 1:nRepets){
 	setwd(FolderPrediction)
 	saveRDS(accuracy, "accuracyMetaClassifier.rds")
 	## ensemble 
-	OP <- readRDS("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Podatki\\Pima\\Partition_1\\03_OutputProfile\\OP_Fold4.rds")
+	setwd(FolderOP)
+	OP <- readRDS("OP_Fold4.rds")
 	predClass <- probToClass(OP, namesBL, classesOfProblem)
 	setwd(FolderKompetentnost)
 	competence <- readRDS("Competence.rds")
 	ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)
 	setwd(FolderPrediction)
 	## add meta data about model
-	saveRDS(ensembleClass, "ensemblePrediction.rds")	
+	saveRDS(ensembleClass, "ensemblePrediction_vote.rds")	
 	## check result
 	print("##############################################################################################")
 	print("##############################################################################################")
@@ -220,18 +223,22 @@ for(i in 1:nRepets){
 
 ## meta classifier original (ONE)
 for(i in 1:nRepets){
+	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
+	setwd(FolderDataPartition)
+	data <- readRDS(paste0(FileData, "_", i, ".rds"))
+	print("training meta classifiere origianl")
 	## putting together all meta problems of BL
 	namesBL <- paste0(modelName, "_", 1:nBL)
-	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
 	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
 	FolderMetaProblem <- paste0(FolderDataPartition, "/04_MetaProblem")
-	FolderMetaClassifier <- paste0(FolderDataPartition, "/05_MetaClassifier_original")
+	FolderMetaClassifier_original <- paste0(FolderDataPartition, "/05_MetaClassifier_original")
 	setwd(FolderOP)
 	outputProfile <- readRDS("OP_Fold3.rds")
+	outputProfileName = "metaSet"
 	namesOfSet_train <- c("Fold1", "Fold2", "Fold3")
 	FolderSave <- paste0(FolderDataPartition, "/04_MetaProblem_original")
 	save_mergeMetaProblems(outputProfile,
-							outputProfileName = "metaSet",
+							outputProfileName,
 							namesBL,
 							namesOfSet_train,
 							K,
@@ -249,43 +256,49 @@ for(i in 1:nRepets){
 	save_trainMetaClassifier(metaProblem = metaProblem, 
 							OP_classMetaSet = OP_classMetaSet,
 							metaALG = metaALG, hC = hC, 
-							FolderMetaClassifier = FolderMetaClassifier)
+							FolderMetaClassifier = FolderMetaClassifier_original)
 							
 	## predictions of original META-DES
-		## test meta problem original
-	namesBL <- paste0(modelName, "_", 1:nBL)
-	setwd(FolderOP)
-	outputProfile <- readRDS("OP_Fold4.rds")
+	## meta problem for test set
+	print("kompetentnost original")
+	FolderMetaProblem_test <- paste0(FolderDataPartition, "/06_MetaPrediction/MetaProblem_prediction")
+	setwd(FolderMetaProblem_test)
 	namesOfSet_test <- c("Fold1", "Fold3", "Fold4")
-	FolderMetaProblem <- paste0(FolderDataPartition, "/06_MetaPrediction/MetaProblem_prediction")
-	FolderSave <- paste0(FolderDataPartition, "/06_MetaPrediction_original/MetaProblem_prediction")
-	save_mergeMetaProblems(outputProfile,
-							outputProfileName = "testSet",
-							namesBL,
-							namesOfSet_test,
-							K,
-							Kp,
-							FolderMetaProblem,
-							FolderSave
-							)
+	loadMetaProblem <- dir()[grepl(paste0(namesBL, collapse ="\\[|"),dir())]
+	parametriModela <- paste0("\\[trainBL]", namesOfSet_test[1],"\\[sosedSet]",namesOfSet_test[2] ,"\\[metaSet]",namesOfSet_test[3] ,"\\[K]",K ,"\\[Kp]",Kp ,"\\[Dist]euclid")
+	loadMetaProblem <- loadMetaProblem[grepl(parametriModela,loadMetaProblem)]
+	testMetaProblem <- lapply(loadMetaProblem, readRDS)
+	names(testMetaProblem) <- sapply(1:length(testMetaProblem), FUN = function(x) testMetaProblem[[x]]$parameters$bl)
+	## meta classifier for test
+	setwd(FolderMetaClassifier_original)
+	nameMetaDesOriginal <- paste0("metaKlasifikator[BL]ALL[trainBL]", namesOfSet_train[1] ,"[sosedSet]", 
+								namesOfSet_train[2] ,"[metaSet]", namesOfSet_train[3] ,"[K]",K ,"[Kp]", 
+								Kp ,"[Dist]euclid[hC]", hC,".rds")
+	testMetaClassifier <- list(ALL = readRDS(nameMetaDesOriginal))
+	## which meta model is used for which meta problem
+	metaModelMap <- rep("ALL", length(namesBL))
+	names(metaModelMap) <- namesBL
 		## kompetentnost
-	FolderKompetentnost <- paste0(FolderDataPartition, "/06_MetaPrediction_original/Kompetentnost")
+	FolderKompetentnost_original <- paste0(FolderDataPartition, "/06_MetaPrediction_original/Kompetentnost")
 	save_Kompetentnost(metaProblem = testMetaProblem, ## list of meta problems 
 						metaClassifier = testMetaClassifier, ## list of meta classifiers
 						mappingProblemClassifier = metaModelMap, ## named vector mapping meta problem to meta classifier
-						Folder = FolderKompetentnost, 
-						File = "Competence"
+						Folder = FolderKompetentnost_original, 
+						File = "Competence_original"
 						)
-	
-	
+	## ensemble prediction original
+	setwd(FolderOP)
+	OP <- readRDS("OP_Fold4.rds")
+	predClass <- probToClass(OP, namesBL, classesOfProblem)
+	setwd(FolderKompetentnost_original)
+	competence <- readRDS("Competence_original.rds")
+	ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)	
+	saveRDS(ensembleClass, "ensemblePredictionOriginal_vote.rds")	
+	print(confusionMatrix(data$Fold4_Y, ensembleClass)$overall[[1]])
+	print("##############################################################################################")
+	print("##############################################################################################")
+
 }
-
-
-
-
-
-
-
 
 
 

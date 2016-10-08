@@ -122,7 +122,7 @@ Save_OutputProfile <- function(featureMatrix, ## list of feature matrix
 	dir.create(Folder, recursive = TRUE)
 	OP <-  NULL
 	for(mdl in models){
-		OPofMdl <- predict(mdl, featureMatrix)
+		OPofMdl <- predict(mdl[[1]], featureMatrix)
 		OP <- cbind(OP, OPofMdl)
 	}
 	colnames(OP) <- c(t(outer(names(models), colnames(OPofMdl), paste, sep = '_')))
@@ -406,13 +406,10 @@ save_Kompetentnost <- function(metaProblem, ## list of meta problems
 {
 	dir.create(Folder, recursive = TRUE)
 	set.seed(seedV)
-	metaProblem <- testMetaProblem
-	metaClassifier <- testMetaClassifier
-	mappingProblemClassifier <- metaModelMap
 	
-	if(!(all(names(metaClassifier) %in% names(mappingProblemClassifier)) &
-	all(names(mappingProblemClassifier) %in% mappingProblemClassifier))){
-		print("names of problem or classifier do not match with names in mapping")
+	if(!(all(names(metaClassifier) %in% mappingProblemClassifier) &
+	all(names(mappingProblemClassifier) %in% names(mappingProblemClassifier)))){
+		stop("names of problem or classifier do not match with names in mapping")
 	}
 	
 	kompetentnost <- NULL
@@ -446,12 +443,6 @@ ensemblePrediction <- function(method = "vote", ## vote
 	ensemblePrediction <- factor(sapply(vote, function(x) names(which(rank(-x, ties.method="random") == 1))))
 	return(ensemblePrediction)
 }
-
-
-
-
-
-
 
 
 

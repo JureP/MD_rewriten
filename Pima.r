@@ -282,46 +282,7 @@ save_mergeMetaProblems(outputProfile,
 						)
 
 
-save_mergeMetaProblems <- function(outputProfile,
-									outputProfileName = "metaSet",
-									namesBL,
-									namesOfSet = c("trainBL", "sosedSet", "metaSet"),
-									K,
-									Kp,
-									FolderMetaProblem,
-									FolderSave = tempdir(),
-									seedV = 123
-									)
-{
-	set.seed(seedV)
-	dir.create(FolderSave, recursive = TRUE)
-	metaFM_1 <- NULL
-	metaClass_1 <- NULL
-	OP_meta_1 <- NULL
-	setwd(FolderMetaProblem)
-	use <- dir()[grepl(paste0(namesBL, collapse ="\\[|"),dir())]
-	parametriModela <- paste0("\\[trainBL]", namesOfSet[1], "\\[sosedSet]", namesOfSet[2], "\\[metaSet]", namesOfSet[3], "\\[K]", K, "\\[Kp]", Kp, "\\[Dist]euclid")
-	use <- use[grepl(parametriModela,use)]
-	for(mtPrblm in use){
-		setwd(FolderMetaProblem)
-		metaProblem_indv <- readRDS(mtPrblm)
-		metaFM_1 <- rbind(metaFM_1, metaProblem_indv$metaFM)
-		metaClass_1 <- c(metaClass_1, as.character(metaProblem_indv$metaClass))
-		setwd(FolderOP)
-		OP_meta_1 <- rbind(OP_meta_1, outputProfile)
-	}
-	metaClass_1 <- factor(metaClass_1)
-	parameters <- metaProblem_indv$parameters
-	parameters$bl <- "ALL"
-	parameters$Models <- namesBL
-	metaProblem <- list(metaFM = metaFM_1, metaClass = metaClass_1, parameters = parameters)
-	
-	nameProblem <- paste0('metaProblem[BL]', parameters$bl,'[trainBL]', namesOfSet[1],
-								'[sosedSet]',namesOfSet[2], '[metaSet]',namesOfSet[3], 
-								'[K]', K, '[Kp]',Kp, '[Dist]euclid.rds')
-	saveRDS(metaProblem, nameProblem)
-	saveRDS(OP_meta_1, paste0("OF_", outputProfileName, "X", length(namesBL), ".rds"))	
-}
+
 
 
 

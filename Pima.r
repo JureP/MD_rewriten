@@ -17,7 +17,7 @@ onsovniPodatki_FM <- osnovniPodatki[, -9]
 set.seed(123)
 
 ## adjustable parameters 
-nRepets <- 10 ## number of cross validations
+nRepets <- 20 ## number of cross validations
 nBL <- 15 ## number of baseLearners
 K <- 5
 Kp <- 5
@@ -199,21 +199,21 @@ for(i in 1:nRepets){
 	setwd(FolderPrediction)
 	saveRDS(accuracy, "accuracyMetaClassifier.rds")
 	## ensemble 
-	setwd(FolderOP)
-	OP <- readRDS("OP_Fold4.rds")
-	predClass <- probToClass(OP, namesBL, classesOfProblem)
-	setwd(FolderKompetentnost)
-	competence <- readRDS("Competence.rds")
-	ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)
-	setwd(FolderPrediction)
-	## add meta data about model
-	saveRDS(ensembleClass, "ensemblePrediction_vote.rds")	
-	## check result
-	print("##############################################################################################")
-	print("##############################################################################################")
-	print(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y))
-	print(confusionMatrix(data$Fold4_Y, ensembleClass)$overall[[1]])
-	print(max(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y)))
+	# setwd(FolderOP)
+	# OP <- readRDS("OP_Fold4.rds")
+	# predClass <- probToClass(OP, namesBL, classesOfProblem)
+	# setwd(FolderKompetentnost)
+	# competence <- readRDS("Competence.rds")
+	# ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)
+	# setwd(FolderPrediction)
+	# add meta data about model
+	# saveRDS(ensembleClass, "ensemblePrediction_vote.rds")	
+	# check result
+	# print("##############################################################################################")
+	# print("##############################################################################################")
+	# print(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y))
+	# print(confusionMatrix(data$Fold4_Y, ensembleClass)$overall[[1]])
+	# print(max(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y)))
 	# cat ("Press [enter] to continue")
 	# line <- readline()
 }
@@ -287,18 +287,93 @@ for(i in 1:nRepets){
 						File = "Competence_original"
 						)
 	## ensemble prediction original
+	# setwd(FolderOP)
+	# OP <- readRDS("OP_Fold4.rds")
+	# predClass <- probToClass(OP, namesBL, classesOfProblem)
+	# setwd(FolderKompetentnost_original)
+	# competence <- readRDS("Competence_original.rds")
+	# ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)	
+	# saveRDS(ensembleClass, "ensemblePredictionOriginal_vote.rds")	
+	# print(confusionMatrix(data$Fold4_Y, ensembleClass)$overall[[1]])
+	# print("##############################################################################################")
+	# print("##############################################################################################")
+
+}
+
+
+## add meta data to competence and ensemble prediction
+
+accuracyOriginal <- NULL
+accuracyInd <- NULL
+accuracyBest <- NULL
+accuracyMean <- NULL
+for(i in 1:nRepets){
+	print(paste("Data", i))
+	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
+	FolderEnsemblePredictions <- paste0(FolderDataPartition, "/07_Result") 
+	dir.create(FolderEnsemblePredictions, recursive = TRUE)
+	setwd(FolderDataPartition)
+	data <- readRDS(paste0(FileData, "_", i, ".rds"))
+	print("meta-des original prediction and accuracy")
+	namesBL <- paste0(modelName, "_", 1:nBL)
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
 	setwd(FolderOP)
 	OP <- readRDS("OP_Fold4.rds")
 	predClass <- probToClass(OP, namesBL, classesOfProblem)
+	FolderKompetentnost_original <- paste0(FolderDataPartition, "/06_MetaPrediction_original/Kompetentnost")
 	setwd(FolderKompetentnost_original)
-	competence <- readRDS("Competence_original.rds")
-	ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)	
+	competence_original <- readRDS("Competence_original.rds")
+	ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence_original, threshold = thrshld)	
+	FolderMETADES_original <- paste0(FolderEnsemblePredictions, "/MetaDes_original") 
+	dir.create(FolderMETADES_original)
+	setwd(FolderMETADES_original)
 	saveRDS(ensembleClass, "ensemblePredictionOriginal_vote.rds")	
-	print(confusionMatrix(data$Fold4_Y, ensembleClass)$overall[[1]])
+	a1 <- confusionMatrix(data$Fold4_Y, ensembleClass)$overall[[1]]
+	accuracyOriginal <- c(accuracyOriginal, a1)
+	print(a1)
 	print("##############################################################################################")
 	print("##############################################################################################")
-
+	print("BL predictions and meta-des individual")
+	FolderKompetentnost <- paste0(FolderDataPartition, "/06_MetaPrediction/Kompetentnost")
+	setwd(FolderKompetentnost)
+	competence <- readRDS("Competence.rds")
+	ensembleClass_ind <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)
+	FolderMETADES_individual <- paste0(FolderEnsemblePredictions, "/MetaDes_individual") 
+	setwd(FolderPrediction)
+	## add meta data about model
+	saveRDS(ensembleClass_ind, "ensemblePrediction_vote.rds")	
+	## compare predictions
+	print("META_DES individual")
+	a2 <- confusionMatrix(data$Fold4_Y, ensembleClass_ind)$overall[[1]]
+	accuracyInd <- c(accuracyInd, a2)
+	print(a2)
+	print("Best BL")
+	a3 <- max(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y))
+	accuracyBest <- c(accuracyBest, a3)
+	print(a3)
+	print("Mean of BL")	
+	a4 <- mean(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y))
+	accuracyMean <- c(accuracyMean, a4)
+	print(a4)
+	print(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y))
+	print("##############################################################################################")
+	print("##############################################################################################")
 }
+nameData <- paste0("Data_", 1:nRepets)
+names(accuracyOriginal) <- nameData
+names(accuracyInd) <- nameData
+names(accuracyBest) <- nameData
+names(accuracyMean) <- nameData
+##
+print(accuracyOriginal)
+print(accuracyInd)
+print(accuracyBest)
+print(accuracyMean)
+##
+mean(accuracyOriginal)
+mean(accuracyInd)
+mean(accuracyBest)
+mean(accuracyMean)
 
 
 

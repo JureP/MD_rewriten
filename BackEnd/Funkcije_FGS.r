@@ -22,11 +22,12 @@ EnsembleSelection <- function(	X, # output profile (z imeni modelvo stoplca)
 								bagFrac = 1L, # delez (nakljucnih) base learnerjev 
 											# iz katerih izbira (na iteraciji)
 								podIter = 1L, # kolikokrat izbere model na podmnozici
-								kriterij = c('accu', 'p/rF', 'rmse') ## katere kriterije izbire
+								kriterij = c('accu', 'p/rF', 'rmse'), ## katere kriterije izbire
 											## modelov naj uporabi:
 												## accu: accuracy
 												## p/rF: precision/recall F score
 												## rmse: root mean square error
+								dataBag = 1 ## bagging of data 
 						){
 	## funkcija iz base-learnerjev sestavi ensemble model tako da iter-krat 
 	## nakljucno izbere bagFrac delez base-learnerjev in osnovnemu ensemblu
@@ -59,7 +60,7 @@ EnsembleSelection <- function(	X, # output profile (z imeni modelvo stoplca)
 		colnames(prob) <- levels(Y)
 		
 		addWeights <- probEnsSelKrit(Xb, Y, namesBL[namesBL %in% bag], iter = podIter, prob, podIter*sumWeights,
-									kriterij = kriterij)
+									kriterij = kriterij, dataBag = dataBag)
 		# addWeights <- probEnsSel(Xb, Y, iter = podIter, prob, podIter * sumWeights)
 		## dodajanje utezi
 		weights[bag] <- weights[bag] + addWeights
@@ -107,12 +108,16 @@ probEnsSelKrit <- function( X, ## library of model predictions (matrix)
 												## rmse: root mean square error
 						n = 2L, ## stevilo najboljsih modelov, ki dobi tocke
 						nSk = c(2,1), ## lestvica tock (dolzine n)
-						utezKriterija = c(1, 1, 1, 1) ## utez vsakega kriterija 
+						utezKriterija = c(1, 1, 1, 1), ## utez vsakega kriterija 
 													## dolzine 4!!! 
 													## vrstni red: accu, precision, p/rF, rmse
+						dataBag = 1 ## bagging of data 
 						){
   ## funkcija izvede iter iteracij dodajanja base learner modelov iz matrike X ensemble modelu, ki 
   ## je karakteriziran s pomocjo zacetnih verjetnostnih napovedi (prob) in teze le-teh (sumWeights)
+  delPodatki <- sample(1:length(Y), dataBag * length(Y))
+  X <- X[delPodatki,]
+  Y <- Y[delPodatki]
   N           <- length(namesBL)
   weights     <- rep(0L, N)
   pred        <- prob * sumWeights
@@ -338,22 +343,32 @@ bagF <- 0.5
 stIter <- 150
 stPodIter <- 5
 izbKrit <- c('accu', 'precision','p/rF', 'rmse')
+dataBag = 0.7
+
+namesBL <- sample(namesBL)
+
+X1 <- NULL
+for(i in namesBL){
+	X1 <- cbind(X1, X[,grepl(paste0(i, '_'), colnames(X))])
+}
+
+X <- X1
 
 
 t1 <- Sys.time()
-ensemble <- EnsembleSelection(X, Y, namesBL, iter = stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit)
+ensemble <- EnsembleSelection(X, Y, namesBL, iter = stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit, dataBag = 1)
 t2 <- Sys.time()
 tp <- t2 - t1
 
 
-A <- probToClass(X, namesBL, levels(Y))
-for(i in 1:ncol(A)){
-	print(sum(A[,i] == Y))
-}
+# A <- probToClass(X, namesBL, levels(Y))
+# for(i in 1:ncol(A)){
+	# print(sum(A[,i] == Y))
+# }
 
 
 
-A == Y
+# A == Y
 
 
 

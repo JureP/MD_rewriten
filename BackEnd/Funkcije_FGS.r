@@ -120,7 +120,7 @@ probEnsSelKrit <- function( X, ## library of model predictions (matrix)
   Y <- Y[delPodatki]
   N           <- length(namesBL)
   weights     <- rep(0L, N)
-  pred        <- prob * sumWeights
+  pred        <- prob[delPodatki,] * sumWeights
   niter       <- 0L
   while(niter < iter) {
 	  #print(niter)
@@ -128,6 +128,9 @@ probEnsSelKrit <- function( X, ## library of model predictions (matrix)
       sumWeights    <- sumWeights + 1L
 		newPred <- NULL
 		for (i in namesBL){
+			# print(dim(pred))
+			# print("X")
+			# print(dim(X[ , grepl(paste0(i, '_'), colnames(X))]))
 			newPred <- cbind(newPred, X[ , grepl(paste0(i, '_'), colnames(X))] + pred)
 		}
 		pred <- newPred/sumWeights
@@ -336,100 +339,28 @@ probToClass <- function(outputProfile, ## matrika napovedi z imeni stolpcev [for
 ### WRAPP #############################################################################################
 
 
-X <- readRDS("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Podatki\\Pima\\Partition_1\\03_OutputProfile\\OP_Fold3.rds")
-Y <- readRDS("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Podatki\\Pima\\Partition_1\\Pima_1.rds")$Fold3_Y
-namesBL <- paste0("linearModel_", 1:20)
-bagF <- 0.5
-stIter <- 150
-stPodIter <- 5
-izbKrit <- c('accu', 'precision','p/rF', 'rmse')
-dataBag = 0.7
+# X <- readRDS("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Podatki\\Pima\\Partition_1\\03_OutputProfile\\OP_Fold3.rds")
+# Y <- readRDS("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Podatki\\Pima\\Partition_1\\Pima_1.rds")$Fold3_Y
+# namesBL <- paste0("linearModel_", 1:20)
+# bagF <- 0.5
+# stIter <- 500
+# stPodIter <- 5
+# izbKrit <- c('accu', 'precision','p/rF', 'rmse')
+# dataBag = 0.7
 
-namesBL <- sample(namesBL)
+# namesBL <- sample(namesBL)
 
-X1 <- NULL
-for(i in namesBL){
-	X1 <- cbind(X1, X[,grepl(paste0(i, '_'), colnames(X))])
-}
-
-X <- X1
-
-
-t1 <- Sys.time()
-ensemble <- EnsembleSelection(X, Y, namesBL, iter = stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit, dataBag = 1)
-t2 <- Sys.time()
-tp <- t2 - t1
-
-
-# A <- probToClass(X, namesBL, levels(Y))
-# for(i in 1:ncol(A)){
-	# print(sum(A[,i] == Y))
+# X1 <- NULL
+# for(i in namesBL){
+	# X1 <- cbind(X1, X[,grepl(paste0(i, '_'), colnames(X))])
 # }
 
+# X <- X1
 
 
-# A == Y
-
-
-
-## izbira parametrov funkcije EnsembleSelection + Platt scalint Yes/No 
-izvedbaES <- function(	X, ## library of base-learners
-						Y, ## true class
-						scaled = FALSE, ## ali uporabi Platt scaling
-						stIter = 100, ## stevilo iteracij
-						bagF =  0.5, ## bagging fraction
-						stPodIter = 5, ## st iteracij na nakljucno izbrani podmnozici
-						izbKrit = c('accu', 'precision','p/rF', 'rmse') ## kriterij izbire 
-	## funkcija izvede ensemble selection s funkcijo EnsembleSelection in uporabi parametre 
-	## iter =stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit
-	## scaled = TRUE uporabi Platt scaling na verjetnostnih napovedih,
-	## scaled = FALSE uporabi neskalirane napovedi	
-		){
-	
-	## Platt scaling
-	if (scaled == TRUE){
-		Xcalib <- NA * X
-		for(i in 1:ncol(X)){
-			print(i)
-			## select model on train set
-			model <- PlattScaling(as.vector(X[,i]) ,Y)
-
-			## use model on test set
-			dataTest <- data.frame(X[,i])
-			names(dataTest) <- 'x'
-			Xcalib[ , i] <- predict(model, newdata = dataTest, type = 'response')
-		}
-	}
-
-
-	## Brez: Platt scaling
-	if(scaled == FALSE){
-		t1 <- Sys.time()
-		ensemble <- EnsembleSelection(X, Y, iter =stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit)
-		t2 <- Sys.time()
-		tp <- t2 - t1
-	}
-	## S: Platt scaling
-	if (scaled == TRUE){
-		t1 <- Sys.time()
-		ensemble <- EnsembleSelection(Xcalib, Y, iter =stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit)
-		t2 <- Sys.time()
-		tp <- t2 - t1
-	}
-
-	ensemble <- data.frame(ensemble)
-	names(ensemble) <- names(X)
-
-	#finalEnsemble <- as.vector(tail(ensemble,1))
-	#names(finalEnsemble) <- names(X)
-	#plot(finalEnsemble)
-	
-	return(ensemble)
-}
-
-
-
-
-
+# t1 <- Sys.time()
+# ensemble <- EnsembleSelection(X, Y, namesBL, iter = stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit, dataBag = 1)
+# t2 <- Sys.time()
+# tp <- t2 - t1
 
 

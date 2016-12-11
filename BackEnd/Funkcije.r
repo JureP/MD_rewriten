@@ -64,6 +64,7 @@ Save_dataPartition <- function(podatki_FM, ## feature matrix
 		saveFolder <- paste0(Folder, "/Partition_", i)
 		dir.create(saveFolder, recursive = TRUE)
 		nameFile <- paste0(File, "_", i, ".rds")
+		podatki$MetaData <- nameFile
 		setwd(saveFolder)
 		if(nameFile %in% dir()){
 			print(paste("model", nameFile, "already saved"))
@@ -399,10 +400,11 @@ save_trainMetaClassifier <- function(metaProblem, ## list of (metaFM, metaClass,
 save_Kompetentnost <- function(metaProblem, ## list of meta problems 
 								metaClassifier, ## list of meta classifiers
 								mappingProblemClassifier, ## named vector mapping meta problem to meta classifier
-								Folder = tempdir(), ##
-								File = "Competence", ##
+								Folder = tempdir(), ## save folder naem
+								File = "Competence", ## save file name 
 								seedV = 123 ## seed used
 								)
+	## kompetentnost base learnerjev ocenjena z Meta-Des
 {
 	dir.create(Folder, recursive = TRUE)
 	set.seed(seedV)
@@ -422,38 +424,70 @@ save_Kompetentnost <- function(metaProblem, ## list of meta problems
 
 
 
-ensemblePrediction <- function(method = "vote", ## vote
-								predClass,	
+ensemblePrediction <- function(method = "vote", ## vote, weighted
+								OutputProfile,
+								namesBL,
+								classesOfProblem,
 								competence,
 								threshold = 0.8
 								)
 {
-	## take x with highest competence
+	if(method == "vote"){
+		print(method)
+		predClass <- probToClass(OutputProfile, namesBL, classesOfProblem)
+		## take x with highest competence		
+		incompetent <- competence < threshold
+		competentPredictions <- predClass
+		competentPredictions[incompetent] <- NA
+		## if non competent, choose all
+		competentPredictions[apply(is.na(competentPredictions),1, all),] <- predClass[apply(is.na(competentPredictions),1, all),]
+		## randomly selected if tied
+		vote <- apply(competentPredictions, 1, table)
+		ensemblePrediction <- factor(sapply(vote, function(x) names(which(rank(-x, ties.method="random") == 1))))
+		return(ensemblePrediction)
+	}
 	
-	incompetent <- competence < threshold
-	
-	competentPredictions <- predClass
-	competentPredictions[incompetent] <- NA
-	
-	## if non competent, choose all
-	competentPredictions[apply(is.na(competentPredictions),1, all),] <- predClass[apply(is.na(competentPredictions),1, all),]
-	
-	## randomly selected if tied
-	vote <- apply(competentPredictions, 1, table)
-	ensemblePrediction <- factor(sapply(vote, function(x) names(which(rank(-x, ties.method="random") == 1))))
-	return(ensemblePrediction)
+	if(method == "weighted"){
+		print(method)
+		## take x with highest competence		
+		incompetent <- competence < threshold
+		## if none is competente use all
+		incompetent[apply(incompetent, 1, all), ] <- FALSE
+		competence[incompetent] <- 0
+		OP_weighted <- matrix(0, nrow(OPmdl), length(classesOfProblem))
+		colnames(OP_weighted) <- paste0("ensembleH_", classesOfProblem)
+		for(mdl in paste0(namesBL, '_')){
+			compMDL <- competence[,grepl(mdl, colnames(competence))]
+			OPmdl <- OutputProfile[,grepl(mdl, colnames(OutputProfile))]
+			OP_weighted <- OP_weighted + OPmdl*compMDL
+		}
+		OP_ensembleNormalized <- OP_weighted/rowSums(competence)
+		ensemblePrediction <- probToClass(OP_ensembleNormalized, paste0("ensembleH"), classesOfProblem)[,1]
+		return(ensemblePrediction)
+	}
 }
 
 
+LocClasAcc <- function(OP_test, ## Matrix of base learner prediction
+						OP_neigbours, ## Matrix of neigours in neigbour set
+						yNeigbourSet, ## class of cases in neighbour set
+						matrikaSosedje, ## kNN sosedje glede na feature matrix
+						namesBL, ## list of meta classifiers
+						Folder = tempdir(), ##
+						File = "Competence", ##
+						seedV = 123 ## seed used
+								)
+	## kompetentnost ocenjena z Local classifier accuracy (LCA)
+{
+	dir.create(Folder, recursive = TRUE)
+	set.seed(seedV)
 
-
-
-
-
-
-
-
-
+	napovedClassSosedi <- probToClass(OP_neigbours, namesBL, levels(yNeigbourSet))
+	kompetentnost <- t(apply(matrikaSosedje, 1, function(x) colSums(as.matrix(napovedClassSosedi[x,namesBL]) == yNeigbourSet[x])/length(x)))
+	
+	saveRDS(kompetentnost, paste0(Folder, "/",File, ".rds"))
+	
+}
 
 
 

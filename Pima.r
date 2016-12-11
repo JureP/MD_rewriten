@@ -2,6 +2,7 @@
 ## source("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Koda\\Pima.r")
 ## funkcije:
 source("C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Koda/BackEnd/Funkcije.r")
+source("C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Koda/BackEnd/Funkcije_FGS.r")
 library(mlbench)
 library(dplyr)
 library(caret)
@@ -18,15 +19,16 @@ set.seed(123)
 
 ## adjustable parameters 
 nRepets <- 20 ## number of cross validations
-nBL <- 15 ## number of baseLearners
+nBL <- 20 ## number of baseLearners
 K <- 5
 Kp <- 5
 metaALG <- "rf"
-hC <- 0.9
+hC <- 0.75
 thrshld <- 0.8
 
 ## parameters 
 modelName <- "linearModel"
+namesBL <- paste0(modelName, "_", 1:nBL)
 FileData <- 'Pima'
 FolderData <- "C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Podatki/Pima"
 # FolderBL <- "C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Podatki/Pima/02_BaseLearner"
@@ -44,7 +46,7 @@ Save_dataPartition(onsovniPodatki_FM, onsovniPodatki_response,
 					Folder = FolderData)
 					
 
-					
+
 ## test of working (correct selection of sets)
 # data <- readRDS("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Podatki\\Pima\\Partition_1\\Pima_1.rds")
 
@@ -69,10 +71,9 @@ for(i in 1:nRepets){
 	FolderBL <- paste0(FolderDataPartition, "/02_BaseLearner")
 	Save_baseLearner(onsovniPodatki_FM, onsovniPodatki_response,
 					nModels = nBL, Folder = FolderBL, File = modelName)
-	## base learner prediction	
+	## base learner prediction
 	print("output profile")
 	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
-	namesBL <- paste0(modelName, "_", 1:nBL)
 	load <- paste0(FolderBL, "/", namesBL, ".rds")
 	models <- lapply(load, readRDS)
 	names(models) <- namesBL
@@ -228,7 +229,7 @@ for(i in 1:nRepets){
 	data <- readRDS(paste0(FileData, "_", i, ".rds"))
 	print("training meta classifiere origianl")
 	## putting together all meta problems of BL
-	namesBL <- paste0(modelName, "_", 1:nBL)
+	## namesBL <- paste0(modelName, "_", 1:nBL)
 	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
 	FolderMetaProblem <- paste0(FolderDataPartition, "/04_MetaProblem")
 	FolderMetaClassifier_original <- paste0(FolderDataPartition, "/05_MetaClassifier_original")
@@ -303,9 +304,13 @@ for(i in 1:nRepets){
 
 ## add meta data to competence and ensemble prediction
 
+
+
+## comparison of model accuracy
 accuracyOriginal <- NULL
 accuracyInd <- NULL
 accuracyBest <- NULL
+accuracyBestValid <- NULL
 accuracyMean <- NULL
 for(i in 1:nRepets){
 	print(paste("Data", i))
@@ -315,7 +320,7 @@ for(i in 1:nRepets){
 	setwd(FolderDataPartition)
 	data <- readRDS(paste0(FileData, "_", i, ".rds"))
 	print("meta-des original prediction and accuracy")
-	namesBL <- paste0(modelName, "_", 1:nBL)
+	## namesBL <- paste0(modelName, "_", 1:nBL)
 	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
 	setwd(FolderOP)
 	OP <- readRDS("OP_Fold4.rds")
@@ -323,7 +328,13 @@ for(i in 1:nRepets){
 	FolderKompetentnost_original <- paste0(FolderDataPartition, "/06_MetaPrediction_original/Kompetentnost")
 	setwd(FolderKompetentnost_original)
 	competence_original <- readRDS("Competence_original.rds")
-	ensembleClass <- ensemblePrediction(method = "vote", predClass,	competence_original, threshold = thrshld)	
+	ensembleClass <- ensemblePrediction(#method = "vote",
+										method = "weighted",
+										OutputProfile = OP,
+										namesBL,
+										classesOfProblem = levels(data$Fold1_Y),
+										competence = competence_original,
+										threshold = thrshld)	
 	FolderMETADES_original <- paste0(FolderEnsemblePredictions, "/MetaDes_original") 
 	dir.create(FolderMETADES_original)
 	setwd(FolderMETADES_original)
@@ -337,11 +348,30 @@ for(i in 1:nRepets){
 	FolderKompetentnost <- paste0(FolderDataPartition, "/06_MetaPrediction/Kompetentnost")
 	setwd(FolderKompetentnost)
 	competence <- readRDS("Competence.rds")
-	ensembleClass_ind <- ensemblePrediction(method = "vote", predClass,	competence,	threshold = thrshld)
+	ensembleClass_ind <- ensemblePrediction(#method = "vote", 
+											method = "weighted",	
+											OutputProfile = OP,
+											namesBL,
+											classesOfProblem = levels(data$Fold1_Y),
+											competence = competence,
+											threshold = thrshld)	
 	FolderMETADES_individual <- paste0(FolderEnsemblePredictions, "/MetaDes_individual") 
 	setwd(FolderPrediction)
 	## add meta data about model
 	saveRDS(ensembleClass_ind, "ensemblePrediction_vote.rds")	
+	
+	## selecting best model on validation set
+	## namesBL <- paste0(modelName, "_", 1:nBL)
+	## BLoneValidSet <- rbind(data$Fold2_FM, data$Fold3_FM)
+	yBLoneValidSet <- factor(c(as.character(data$Fold2_Y), as.character(data$Fold3_Y)))
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")	
+	setwd(FolderOP)
+	OP_validBL <- rbind(readRDS("OP_Fold2.rds"), readRDS("OP_Fold3.rds"))
+	predClassVALID <- probToClass(OP_validBL, namesBL, classesOfProblem)	
+	blAccuracy <- sapply(predClassVALID, function(x, y) confusionMatrix(x, y)$overall[[1]], yBLoneValidSet)
+	bestBLOnValid <- which.max(blAccuracy)	
+	
+	
 	## compare predictions
 	print("META_DES individual")
 	a2 <- confusionMatrix(data$Fold4_Y, ensembleClass_ind)$overall[[1]]
@@ -356,6 +386,10 @@ for(i in 1:nRepets){
 	accuracyMean <- c(accuracyMean, a4)
 	print(a4)
 	print(sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y))
+	print("Best BL on valid")
+	a5 <- sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], data$Fold4_Y)[bestBLOnValid]
+	accuracyBestValid <- c(accuracyBestValid, a5)
+	print(a5)
 	print("##############################################################################################")
 	print("##############################################################################################")
 }
@@ -363,31 +397,148 @@ nameData <- paste0("Data_", 1:nRepets)
 names(accuracyOriginal) <- nameData
 names(accuracyInd) <- nameData
 names(accuracyBest) <- nameData
+names(accuracyBestValid) <- nameData
 names(accuracyMean) <- nameData
 ##
 print(accuracyOriginal)
 print(accuracyInd)
 print(accuracyBest)
+print(accuracyBestValid)
 print(accuracyMean)
 ##
 mean(accuracyOriginal)
 mean(accuracyInd)
 mean(accuracyBest)
+mean(accuracyBestValid)
 mean(accuracyMean)
 
 
 
-## knora
 
-## ??
+## LA_OLA (ACCURACY ON FM NEIGBOURS)
+## do a parameter tunning on a different set
+## do a parameter tunning on a different set
+
+for(i in 1:nRepets){
+	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
+	setwd(FolderDataPartition)
+	data <- readRDS(paste0(FileData, "_", i, ".rds"))
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
+	
+	LocClasAcc <- function(OP_test, ## Matrix of base learner prediction
+							OP_neigbours, ## Matrix of neigours in neigbour set
+							yNeigbourSet, ## class of cases in neighbour set
+							matrikaSosedje, ## kNN sosedje glede na feature matrix
+							namesBL, ## list of meta classifiers
+							Folder = tempdir(), ##
+							File = "Competence", ##
+							seedV = 123 ## seed used
+							)
+
+
+## ACCURACY ON OP NEIGHBOUR
+
+
+
+## Meta learning
 
 ## meta-des.H
 
-## greedy forward search
+## greedy forward search ####################################################################
+#############################################################################################
+#############################################################################################
 
-## best BL on valid set
+
+
+
+
+
+for(i in 1:nRepets){
+	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
+	FolderComparisonMethods <- paste0(FolderDataPartition, "/08_ComparisonModels")
+	dir.create(FolderComparisonMethods)
+	setwd(FolderDataPartition)
+	data <- readRDS(paste0(FileData, "_", i, ".rds"))
+	
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
+	## base-learner library
+	## X output profile ## TO BE ADOPTED FOR USE WITH MULTIPLE CLASSES
+	## USE probabilityToClass in modelSelection
+	## adopt bagging so that is selects all the probablities from one base learner and sends it to the next stage
+	## Y respose vector
+	## test this only on two class problems
+	setwd(FolderOP)
+	X <- readRDS("OP_Fold3.rds")
+	Y <- data$Fold3_Y
+	## izbira parametrov (gelje EnsembleSelection_funtion.r (razen Platt scaling))
+	scaled = FALSE ## ali uporabi Platt scaling
+	stIter <- 200 ## stevilo iteracij
+	bagF <- 0.5 ## bagging fraction
+	stPodIter <- 5 ## st iteracij na nakljucno izbrani podmnozici
+	izbKrit <- cizbKrit <- c('accu', 'precision','p/rF', 'rmse')
+	dataBag <- 0.7
+
+	## namesBL <- paste0(modelName, "_", 1:nBL)
+# bagF <- 0.5
+# stIter <- 150
+# stPodIter <- 5
+# izbKrit <- c('accu', 'precision','p/rF', 'rmse')
+	
+	
+	ensemble <- EnsembleSelection(X, Y, namesBL, iter = stIter, bagFrac = bagF, podIter = stPodIter, kriterij = izbKrit, dataBag = dataBag)
+	setwd(FolderComparisonMethods)
+	saveRDS(ensemble, paste0("FGS_ensemble", stIter, "_", bagF, "_", stPodIter, "_", dataBag, ".rds"))
+	
+	## napoved 
+	setwd(FolderOP)
+	OP_test <- readRDS("OP_Fold4.rds")
+	Ytest <- data$Fold4_Y
+	
+	ensembleLast <- tail(readRDS(paste0("FGS_ensemble",stIter, "_", bagF, "_", stPodIter, "_", dataBag, ".rds")),1)
+	
+	FGS_kompetentnost <- matrix(ensembleLast, nrow=nrow(OP_test), ncol=length(ensembleLast), byrow=TRUE)
+	
+	ensemblePrediction <- function(method = "vote", ## vote
+								predClass,	
+								competence,
+								threshold = 0.8
+								)
+	
+	}
 
 ## best BL
+
+
+{## best BL on valid set
+
+for(i in 1:nRepets){
+	## accuracy modelov na validacijski mnozici ()
+	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
+	setwd(FolderDataPartition)
+	data <- readRDS(paste0(FileData, "_", i, ".rds"))
+	
+	## namesBL <- paste0(modelName, "_", 1:nBL)
+	## BLoneValidSet <- rbind(data$Fold2_FM, data$Fold3_FM)
+	yBLoneValidSet <- factor(c(as.character(data$Fold2_Y), as.character(data$Fold3_Y)))
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")	
+	setwd(FolderOP)
+	OP_validBL <- rbind(readRDS("OP_Fold2.rds"), readRDS("OP_Fold3.rds"))
+	predClass <- probToClass(OP_validBL, namesBL, classesOfProblem)	
+	## accuracy of all models
+	blAccuracy <- sapply(predClass, function(x, y) confusionMatrix(x, y)$overall[[1]], yBLoneValidSet)
+	bestOnValid <- which.max(blAccuracy)
+	
+	blAccuracy[bestOnValid]
+
+	
+}
+
+
+
+
+
+
+}
 
 ## oracle 
 

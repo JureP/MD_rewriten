@@ -1,8 +1,8 @@
 
 ## source("C:\\Users\\jurep\\OneDrive\\Documents\\Koda\\MetaDes\\Koda\\Pima.r")
 ## funkcije:
-source("C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Koda/BackEnd/Funkcije.r")
-source("C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Koda/BackEnd/Funkcije_FGS.r")
+source("C:/Users/jurep/Documents/Koda/Magisterska/MetaDes_Test/Funckije.r")
+source("C:/Users/jurep/Documents/Koda/Magisterska/MetaDes_Test/Funkcije_FGS.r")
 library(mlbench)
 library(dplyr)
 library(caret)
@@ -30,11 +30,11 @@ thrshld <- 0.8
 modelName <- "linearModel"
 namesBL <- paste0(modelName, "_", 1:nBL)
 FileData <- 'Pima'
-FolderData <- "C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Podatki/Pima"
+FolderData <- "C:/Users/jurep/Documents/Koda/Magisterska/MetaDes_Test/Podatki/Pima"
+dir.create(FolderData, recursive = FALSE)
 # FolderBL <- "C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Podatki/Pima/02_BaseLearner"
 # FolderOP <- "C:/Users/jurep/OneDrive/Documents/Koda/MetaDes/Podatki/03_OutputProfile"
 
-dir.create(FolderData, recursive = FALSE)
 # dir.create(FolderBL, recursive = FALSE)
 # dir.create(FolderOP, recursive = FALSE)
 classesOfProblem <- levels(onsovniPodatki_response)
@@ -472,7 +472,7 @@ for(i in 1:nRepets){
 	Y <- data$Fold3_Y
 	## izbira parametrov (gelje EnsembleSelection_funtion.r (razen Platt scaling))
 	scaled = FALSE ## ali uporabi Platt scaling
-	stIter <- 200 ## stevilo iteracij
+	stIter <- 100 ## stevilo iteracij
 	bagF <- 0.5 ## bagging fraction
 	stPodIter <- 5 ## st iteracij na nakljucno izbrani podmnozici
 	izbKrit <- cizbKrit <- c('accu', 'precision','p/rF', 'rmse')
@@ -489,21 +489,28 @@ for(i in 1:nRepets){
 	setwd(FolderComparisonMethods)
 	saveRDS(ensemble, paste0("FGS_ensemble", stIter, "_", bagF, "_", stPodIter, "_", dataBag, ".rds"))
 	
+	ensembleLast <- tail(readRDS(paste0("FGS_ensemble",stIter, "_", bagF, "_", stPodIter, "_", dataBag, ".rds")),1)
+	
+	## obravavaj kot nedinamična kompetentnost 
+	FGS_kompetentnost <- matrix(ensembleLast, nrow=nrow(OP_test), ncol=length(ensembleLast), byrow=TRUE)
+	colnames(FGS_kompetentnost) <- paste0(namesBL, "_kompetentnost")
+
 	## napoved 
 	setwd(FolderOP)
 	OP_test <- readRDS("OP_Fold4.rds")
 	Ytest <- data$Fold4_Y
+
 	
-	ensembleLast <- tail(readRDS(paste0("FGS_ensemble",stIter, "_", bagF, "_", stPodIter, "_", dataBag, ".rds")),1)
+	FGS_prediction <- ensemblePrediction(method = "weighted", 
+							OutputProfile = OP_test, 
+							namesBL,
+							classesOfProblem, 
+							competence = FGS_kompetentnost, 
+							threshold = 0)
 	
-	FGS_kompetentnost <- matrix(ensembleLast, nrow=nrow(OP_test), ncol=length(ensembleLast), byrow=TRUE)
-	
-	ensemblePrediction <- function(method = "vote", ## vote
-								predClass,	
-								competence,
-								threshold = 0.8
-								)
-	
+	accuracyFGS <- confusionMatrix(Ytest, FGS_prediction)$overall[[1]]
+
+
 	}
 
 ## best BL

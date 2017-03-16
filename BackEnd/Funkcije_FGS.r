@@ -45,7 +45,7 @@ EnsembleSelection <- function(	X, # output profile (z imeni modelvo stoplca)
 	sumWeights <- 0L
 	potekUtezi <- matrix(NA, iter, N)
 	while (sumWeights < iter){
-		print(sumWeights + 1)
+		print(paste("Number of iterations:",sumWeights + 1, "out of", iter))
 		## izbor nakljucne podmnozice modelov
 		sumWeights <- sumWeights + 1L
 		bag <- sort(sample(namesBL, length(namesBL)*bagFrac))

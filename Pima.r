@@ -400,9 +400,14 @@ names(accuracyBest) <- nameData
 names(accuracyBestValid) <- nameData
 names(accuracyMean) <- nameData
 ##
+## originalni meta des
 print(accuracyOriginal)
+## meta des s individualnim meta klasifikatorjem
 print(accuracyInd)
+## 
+## accuracy of best BL
 print(accuracyBest)
+## accuracy of best BL on the validation set
 print(accuracyBestValid)
 print(accuracyMean)
 ##
@@ -411,6 +416,12 @@ mean(accuracyInd)
 mean(accuracyBest)
 mean(accuracyBestValid)
 mean(accuracyMean)
+## variance
+var(accuracyOriginal)
+var(accuracyInd)
+var(accuracyBest)
+var(accuracyBestValid)
+var(accuracyMean)
 
 
 
@@ -435,7 +446,7 @@ for(i in 1:nRepets){
 							seedV = 123 ## seed used
 							)
 
-
+}
 ## ACCURACY ON OP NEIGHBOUR
 
 
@@ -452,7 +463,7 @@ for(i in 1:nRepets){
 
 
 
-
+accuracyFGS <- NULL
 for(i in 1:nRepets){
 	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
 	FolderComparisonMethods <- paste0(FolderDataPartition, "/08_ComparisonModels")
@@ -472,8 +483,8 @@ for(i in 1:nRepets){
 	Y <- data$Fold3_Y
 	## izbira parametrov (gelje EnsembleSelection_funtion.r (razen Platt scaling))
 	scaled = FALSE ## ali uporabi Platt scaling
-	stIter <- 100 ## stevilo iteracij
-	bagF <- 0.5 ## bagging fraction
+	stIter <- 200 ## stevilo iteracij
+	bagF <- 0.3 ## bagging fraction
 	stPodIter <- 5 ## st iteracij na nakljucno izbrani podmnozici
 	izbKrit <- cizbKrit <- c('accu', 'precision','p/rF', 'rmse')
 	dataBag <- 0.7
@@ -494,7 +505,7 @@ for(i in 1:nRepets){
 	## obravavaj kot nedinamična kompetentnost 
 	FGS_kompetentnost <- matrix(ensembleLast, nrow=nrow(OP_test), ncol=length(ensembleLast), byrow=TRUE)
 	colnames(FGS_kompetentnost) <- paste0(namesBL, "_kompetentnost")
-
+	
 	## napoved 
 	setwd(FolderOP)
 	OP_test <- readRDS("OP_Fold4.rds")
@@ -508,15 +519,18 @@ for(i in 1:nRepets){
 							competence = FGS_kompetentnost, 
 							threshold = 0)
 	
-	accuracyFGS <- confusionMatrix(Ytest, FGS_prediction)$overall[[1]]
+	aFGS <- confusionMatrix(Ytest, FGS_prediction)$overall[[1]]
+	accuracyFGS <- c(accuracyFGS, aFGS)
+	## print(accuracyFGS)
 
-
+	sapply(probToClass(X,namesBL, classesOfProblem), function(x, y) confusionMatrix(x, y)$overall[[1]], Y)
+	
 	}
 
 ## best BL
 
 
-{## best BL on valid set
+{## best BL on valid set (already done above!!)
 
 for(i in 1:nRepets){
 	## accuracy modelov na validacijski mnozici ()
@@ -538,6 +552,16 @@ for(i in 1:nRepets){
 	blAccuracy[bestOnValid]
 
 	
+	
+	
+	yBLoneValidSet <- factor(c(as.character(data$Fold2_Y), as.character(data$Fold3_Y)))
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")	
+	setwd(FolderOP)
+	OP_validBL <- rbind(readRDS("OP_Fold2.rds"), readRDS("OP_Fold3.rds"))
+	predClassVALID <- probToClass(OP_validBL, namesBL, classesOfProblem)	
+	blAccuracy <- sapply(predClassVALID, function(x, y) confusionMatrix(x, y)$overall[[1]], yBLoneValidSet)
+	bestBLOnValid <- which.max(blAccuracy)	
+	
 }
 
 
@@ -548,6 +572,38 @@ for(i in 1:nRepets){
 }
 
 ## oracle 
+aOracle <- NULL
+for(i in 1:nRepets){
+	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
+	FolderComparisonMethods <- paste0(FolderDataPartition, "/08_ComparisonModels")
+	##dir.create(FolderComparisonMethods)
+	setwd(FolderDataPartition)
+	data <- readRDS(paste0(FileData, "_", i, ".rds"))
+	
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
+	## base-learner library
+	## X output profile ## TO BE ADOPTED FOR USE WITH MULTIPLE CLASSES
+	## USE probabilityToClass in modelSelection
+	## adopt bagging so that is selects all the probablities from one base learner and sends it to the next stage
+	## Y respose vector
+	## test this only on two class problems
+	setwd(FolderOP)
+	X <- readRDS("OP_Fold3.rds")
+	Y <- data$Fold3_Y
+	
+	
+	napovediBL <- probToClass(X, namesBL, classesOfProblem)	
+	PravilnostNapovediBL <- apply(napovediBL, 2, "==", Y)
+	oracle <- apply(PravilnostNapovediBL, 1, any)
+	aOracle <- sum(oracle)/length(oracle)
+	accuracyOracle  <- c(accuracyOracle, aOracle)
+	##print(accuracyOracle)
+}
+mean(accuracyOracle)
+var(accuracyOracle)
 
 
+
+
+probToClass(X, namesBL, classesOfProblem)
 

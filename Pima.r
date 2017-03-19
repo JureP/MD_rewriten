@@ -435,16 +435,41 @@ for(i in 1:nRepets){
 	setwd(FolderDataPartition)
 	data <- readRDS(paste0(FileData, "_", i, ".rds"))
 	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
+	FolderPrediction <- paste0(FolderDataPartition, "/06_MetaPrediction")
+	FolderMetaProblem <- paste0(FolderPrediction, "/MetaProblem_prediction")
+	FolderNeigbour <- paste0(FolderMetaProblem, "/Neigbours")
 	
-	LocClasAcc <- function(OP_test, ## Matrix of base learner prediction
-							OP_neigbours, ## Matrix of neigours in neigbour set
-							yNeigbourSet, ## class of cases in neighbour set
-							matrikaSosedje, ## kNN sosedje glede na feature matrix
-							namesBL, ## list of meta classifiers
-							Folder = tempdir(), ##
-							File = "Competence", ##
-							seedV = 123 ## seed used
+	setwd(FolderOP)
+	OP_test <- readRDS("OP_Fold4.rds")
+	OP_neigbours <- readRDS("OP_Fold3.rds")
+
+	setwd(FolderNeigbour)
+	namesOfSet <- c("Fold1", "Fold3", "Fold4")
+	fileSosedje <- paste0('matrikaSosedje[trainBL]',namesOfSet[1] ,'[neigbourSet]',namesOfSet[2], 
+						'[metaSet]', namesOfSet[3], '[K]',K, '[Dist]euclid.rds')
+	
+	FolderLA_OLA <- paste0(FolderDataPartition, "/08_ComparisonModels/LA_OLA")
+	
+	
+	LocClasAcc(OP_test, ## Matrix of base learner prediction
+				OP_neigbours, ## Matrix of neigours in neigbour set
+				yNeigbourSet, ## class of cases in neighbour set
+				matrikaSosedje, ## kNN sosedje glede na feature matrix
+				namesBL, ## list of meta classifiers
+				FolderLA_OLA, ##
+				File = "Competence_LAOLA", ##
+				seedV = 123 ## seed used
 							)
+	
+	setwd(Folder)
+	Competence_LAOLA <- readRDS("Competence_LAOLA.rds")
+				
+	a <- ensemblePrediction(method = "weighted", 
+							OutputProfile = OP_test, 
+							namesBL,
+							classesOfProblem, 
+							competence = Competence_LAOLA, 
+							threshold = 0)
 
 }
 ## ACCURACY ON OP NEIGHBOUR
@@ -453,6 +478,42 @@ for(i in 1:nRepets){
 
 ## Meta learning
 
+accuracyMetaLearner <- NULL
+for(i in 1:nRepets){
+	print(paste("meta learning, partition", i, "out of", nRepets))
+	metaALG <- 'rf'
+	
+	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
+	FolderComparisonMethods <- paste0(FolderDataPartition, "/08_ComparisonModels")
+	dir.create(FolderComparisonMethods)
+	setwd(FolderDataPartition)
+	data <- readRDS(paste0(FileData, "_", i, ".rds"))
+	
+	FolderOP <- paste0(FolderDataPartition, "/03_OutputProfile")
+	## base-learner library
+	## X output profile ## TO BE ADOPTED FOR USE WITH MULTIPLE CLASSES
+	## USE probabilityToClass in modelSelection
+	## adopt bagging so that is selects all the probablities from one base learner and sends it to the next stage
+	## Y respose vector
+	## test this only on two class problems
+	yBLoneValidSet <- factor(c(as.character(data$Fold2_Y), as.character(data$Fold3_Y)))
+	setwd(FolderOP)
+	OP_validBL <- rbind(readRDS("OP_Fold2.rds"), readRDS("OP_Fold3.rds"))
+	
+	metaModel <- train(OP_validBL, yBLoneValidSet, method = metaALG)
+
+	## predict 
+
+	setwd(FolderOP)
+	OP_test <- readRDS("OP_Fold4.rds")
+	Ytest <- data$Fold4_Y
+	predictionMetaaLearner <- predict(metaModel, OP_test)
+	
+	aMetaLearner <- confusionMatrix(Ytest, predictionMetaaLearner)$overall[[1]]
+	accuracyMetaLearner <- c(accuracyMetaLearner, aMetaLearner)
+
+}
+
 ## meta-des.H
 
 ## greedy forward search ####################################################################
@@ -460,6 +521,7 @@ for(i in 1:nRepets){
 #############################################################################################
 
 
+rbind(accuracyInd, accuracyOriginal, accuracyMetaLearner, accuracyBest)
 
 
 
@@ -572,7 +634,7 @@ for(i in 1:nRepets){
 }
 
 ## oracle 
-aOracle <- NULL
+accuracyOracle <- NULL
 for(i in 1:nRepets){
 	FolderDataPartition <- paste0(FolderData, "/Partition_", i)
 	FolderComparisonMethods <- paste0(FolderDataPartition, "/08_ComparisonModels")
@@ -599,11 +661,22 @@ for(i in 1:nRepets){
 	accuracyOracle  <- c(accuracyOracle, aOracle)
 	##print(accuracyOracle)
 }
-mean(accuracyOracle)
-var(accuracyOracle)
+
+print(mean(accuracyOracle))
+print(var(accuracyOracle))
 
 
+## comparison all
+allAcc <- rbind(accuracyMean, accuracyBestValid, accuracyInd, accuracyOriginal, accuracyMetaLearner, accuracyBest, accuracyOracle)
 
 
-probToClass(X, namesBL, classesOfProblem)
+allAcc <- cbind(allAcc, mean = apply(allAcc, 1, mean))
+
+
+library(ggplot2)
+library(RColorBrewer)  
+library(reshape2)  
+allAcc <- allAcc[-nrow(allAcc),]
+accMelt <- melt(allAcc)
+ggplot(accMelt, aes(x = Var1, y = Var2, fill = value)) + geom_tile()
 
